@@ -1,0 +1,9 @@
+{
+  "name": "lms-nexus",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix Frontend",
+    "build": "npm run build --prefix Frontend",
+    "build:craftx": "npm run build:craftx --prefix Frontend"
+  }
+}
