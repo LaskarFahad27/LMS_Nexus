@@ -123,3 +123,52 @@ CREATE TABLE IF NOT EXISTS lessons (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS enrollments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  progress_percentage DECIMAL(5,2) DEFAULT 0,
+  completed_lessons UUID[] DEFAULT '{}',
+  is_completed BOOLEAN DEFAULT FALSE,
+  completed_at TIMESTAMPTZ,
+  certificate_issued BOOLEAN DEFAULT FALSE,
+  last_accessed_at TIMESTAMPTZ DEFAULT NOW(),
+  enrolled_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(student_id, course_id)
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  enrollment_id UUID UNIQUE REFERENCES enrollments(id) ON DELETE SET NULL,
+  student_id UUID NOT NULL REFERENCES users(id),
+  course_id UUID NOT NULL REFERENCES courses(id),
+  instructor_id UUID NOT NULL REFERENCES users(id),
+  amount DECIMAL(10,2) NOT NULL,
+  platform_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+  instructor_earning DECIMAL(10,2) NOT NULL DEFAULT 0,
+  currency VARCHAR(10) DEFAULT 'BDT',
+  payment_method VARCHAR(50) DEFAULT 'card',
+  payment_status payment_status DEFAULT 'pending',
+  transaction_id VARCHAR(100),
+  eps_transaction_id VARCHAR(64),
+  rejection_reason TEXT,
+  reviewed_at TIMESTAMPTZ,
+  card_last4 VARCHAR(4),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS eps_ipn_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  eps_transaction_id VARCHAR(64),
+  merchant_transaction_id VARCHAR(100),
+  store_id VARCHAR(64),
+  status VARCHAR(32),
+  total_amount DECIMAL(12,4),
+  store_amount DECIMAL(12,4),
+  transaction_type VARCHAR(64),
+  financial_entity VARCHAR(128),
+  ipn_timestamp BIGINT,
+  raw_json TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
