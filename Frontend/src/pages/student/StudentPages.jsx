@@ -150,3 +150,44 @@ export function StudentQuizzes() {
   );
 }
 
+export function ProfilePage() {
+  const { success, error } = useToast();
+  const [saving, setSaving] = useState(false);
+  const { data, setData, loading } = useLiveData(async () => {
+    const r = await api.get('/auth/me');
+    return {
+      name: r.data.user.name || '',
+      bio: r.data.user.bio || '',
+      headline: r.data.user.headline || '',
+    };
+  });
+  const form = data || { name: '', bio: '', headline: '' };
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const { data: res } = await api.put('/auth/profile', form);
+      setData({ name: res.user.name, bio: res.user.bio || '', headline: res.user.headline || '' });
+      success('Profile updated');
+    } catch (err) {
+      error(getError(err, 'Profile update failed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading && !data) return <div className="text-fog">Loading profile...</div>;
+
+  return (
+    <div className="max-w-xl">
+      <h1 className="font-display text-3xl font-extrabold mb-6">Profile</h1>
+      <form onSubmit={save} className="space-y-4 rounded-lg border border-line bg-white p-6">
+        <input className="input-field" value={form.name} onChange={(e) => setData({ ...form, name: e.target.value })} placeholder="Name" />
+        <input className="input-field" value={form.headline} onChange={(e) => setData({ ...form, headline: e.target.value })} placeholder="Headline" />
+        <textarea className="input-field" rows={4} value={form.bio} onChange={(e) => setData({ ...form, bio: e.target.value })} placeholder="Bio" />
+        <button disabled={saving} className="btn-ink">{saving ? 'Saving...' : 'Save changes'}</button>
+      </form>
+    </div>
+  );
+}
