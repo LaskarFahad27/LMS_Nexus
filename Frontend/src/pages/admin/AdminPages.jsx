@@ -313,3 +313,313 @@ export function AdminAnnouncements() {
   );
 }
 
+export function AdminReports() {
+  const { data, loading, error, reload } = useLiveData(async () => (await api.get('/admin/reports')).data);
+  if (loading && !data) return <div className="text-fog">Loading reports...</div>;
+  if (error) return <div className="text-coral">{error} <button onClick={reload}>Retry</button></div>;
+  if (!data) return null;
+
+  const k = data.kpis || {};
+  const revenue = (data.revenueByMonth || []).map((m) => ({
+    label: m.month?.slice(5) || m.month,
+    gross: Number(m.gross),
+    platform: Number(m.platform),
+  }));
+  const enrollments = (data.enrollmentsByMonth || []).map((m) => ({
+    label: m.month?.slice(5) || m.month,
+    enrollments: Number(m.enrollments),
+  }));
+  const courseBars = (data.topCourses || []).map((c) => ({
+    name: shortTitle(c.title, 14),
+    students: Number(c.enrollment_count),
+    rating: Number(c.average_rating),
+  }));
+  const instructorBars = (data.topInstructors || []).map((i) => ({
+    name: i.name.split(' ')[0],
+    earnings: Number(i.earnings),
+    students: Number(i.students),
+  }));
+  const statusColors = { approved: CHART.mint, pending: CHART.sun, draft: CHART.blue, rejected: CHART.coral };
+  const statusPie = (data.courseStatus || []).map((s) => ({
+    name: s.status,
+    value: Number(s.count),
+    color: statusColors[s.status] || CHART.violet,
+  }));
+  const rolePie = (data.usersByRole || []).map((s, i) => ({
+    name: s.role,
+    value: Number(s.count),
+    color: [CHART.cyan, CHART.blue, CHART.violet][i % 3],
+  }));
+  const categories = (data.categoryMix || []).map((c) => ({
+    name: shortTitle(c.name, 12),
+    count: Number(c.count),
+  }));
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="section-kicker">Platform intelligence</div>
+        <h1 className="font-display text-3xl font-extrabold">Reports</h1>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Students" value={Number(k.students || 0)} />
+        <MetricCard label="Instructors" value={Number(k.instructors || 0)} tone="from-blue/15 to-violet/10" />
+        <MetricCard label="Live courses" value={Number(k.live_courses || 0)} tone="from-mint/15 to-cyan/10" />
+        <MetricCard label="Platform revenue" value={formatMoney(k.platform)} hint={`${Number(k.enrollments || 0)} enrollments`} tone="from-sun/20 to-coral/10" />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <ChartPanel title="Revenue over time" subtitle="Gross vs platform commission (BDT)">
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={revenue.length ? revenue : [{ label: '—', gross: 0, platform: 0 }]}>
+                <defs>
+                  <linearGradient id="grossFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={CHART.blue} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={CHART.blue} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={CHART.grid} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(v) => formatMoney(v)} />
+                <Legend />
+                <Area type="monotone" dataKey="gross" stroke={CHART.blue} fill="url(#grossFill)" strokeWidth={3} />
+                <Line type="monotone" dataKey="platform" stroke={CHART.mint} strokeWidth={3} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartPanel>
+
+        <ChartPanel title="Enrollment momentum" subtitle="New enrollments by month">
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={enrollments.length ? enrollments : [{ label: '—', enrollments: 0 }]}>
+                <CartesianGrid stroke={CHART.grid} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="enrollments" stroke={CHART.cyan} strokeWidth={3} dot={{ r: 4, fill: CHART.cyan }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartPanel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <ChartPanel title="Top courses" subtitle="Students enrolled">
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={courseBars.length ? courseBars : [{ name: '—', students: 0 }]} layout="vertical">
+                <CartesianGrid stroke={CHART.grid} horizontal={false} />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="students" fill={CHART.cyan} radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartPanel>
+
+        <ChartPanel title="Top instructors" subtitle="Earnings in BDT">
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={instructorBars.length ? instructorBars : [{ name: '—', earnings: 0 }]}>
+                <CartesianGrid stroke={CHART.grid} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis />
+                <Tooltip formatter={(v) => formatMoney(v)} />
+                <Bar dataKey="earnings" fill={CHART.blue} radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartPanel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-3">
+        <ChartPanel title="Course status" subtitle="Marketplace pipeline">
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={statusPie.length ? statusPie : [{ name: 'none', value: 1, color: CHART.grid }]} dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={3}>
+                  {(statusPie.length ? statusPie : []).map((s) => <Cell key={s.name} fill={s.color} />)}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartPanel>
+        <ChartPanel title="Users by role" subtitle="Platform mix">
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={rolePie.length ? rolePie : [{ name: 'none', value: 1 }]} dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={3}>
+                  {rolePie.map((s) => <Cell key={s.name} fill={s.color} />)}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartPanel>
+        <ChartPanel title="Categories" subtitle="Approved courses">
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={categories.length ? categories : [{ name: '—', count: 0 }]}>
+                <CartesianGrid stroke={CHART.grid} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill={CHART.mint} radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartPanel>
+      </div>
+    </div>
+  );
+}
+
+export function AdminSettings() {
+  const { success, error } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [commission, setCommission] = useState(0.2);
+  const [siteName, setSiteName] = useState('LMS Nexus');
+  const [chatbotEnabled, setChatbotEnabled] = useState(true);
+  const [craftxModel, setCraftxModel] = useState('Qwen3 VL 30B');
+  const [craftxKey, setCraftxKey] = useState('');
+  const [keyMeta, setKeyMeta] = useState({ configured: false, masked: '' });
+  const [clearKey, setClearKey] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/admin/settings')
+      .then((r) => {
+        if (!active) return;
+        const s = r.data.settings || {};
+        if (s.commission_rate != null) setCommission(Number(s.commission_rate));
+        if (s.site_name) setSiteName(String(s.site_name));
+        if (s.chatbot_enabled != null) setChatbotEnabled(s.chatbot_enabled !== false && s.chatbot_enabled !== 'false');
+        if (s.craftx_model) setCraftxModel(String(s.craftx_model));
+        if (s.craftx_api_key && typeof s.craftx_api_key === 'object') {
+          setKeyMeta({
+            configured: Boolean(s.craftx_api_key.configured),
+            masked: s.craftx_api_key.masked || '',
+          });
+        }
+      })
+      .catch((err) => error(getError(err, 'Failed to load settings')))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
+  }, []);
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        commission_rate: commission,
+        site_name: siteName || 'LMS Nexus',
+        chatbot_enabled: chatbotEnabled,
+        craftx_model: craftxModel || 'Qwen3 VL 30B',
+      };
+      if (clearKey) payload.craftx_api_key = '__CLEAR__';
+      else if (craftxKey.trim()) payload.craftx_api_key = craftxKey.trim();
+
+      await api.put('/admin/settings', payload);
+
+      if (clearKey) setKeyMeta({ configured: false, masked: '' });
+      else if (craftxKey.trim()) {
+        setKeyMeta({ configured: true, masked: `••••••••${craftxKey.trim().slice(-4)}` });
+      }
+      setCraftxKey('');
+      setClearKey(false);
+      success('Settings saved');
+    } catch (err) {
+      error(getError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="text-fog">Loading settings...</div>;
+
+  return (
+    <div className="max-w-2xl">
+      <div className="mb-6">
+        <div className="section-kicker">Admin</div>
+        <h1 className="font-display text-3xl font-extrabold">Platform settings</h1>
+        <p className="mt-1 text-fog">Marketplace commission and Nexus AI (CraftX) configuration.</p>
+      </div>
+
+      <form onSubmit={save} className="space-y-5">
+        <section className="rounded-lg border border-line bg-white p-6 space-y-3">
+          <h2 className="font-display text-xl font-bold">Marketplace</h2>
+          <label className="text-sm font-semibold">Site name</label>
+          <input className="input-field" value={siteName} onChange={(e) => setSiteName(e.target.value)} />
+          <label className="text-sm font-semibold">Commission rate</label>
+          <input type="number" step="0.01" min="0" max="1" value={commission} onChange={(e) => setCommission(Number(e.target.value))} className="input-field" />
+          <p className="text-xs text-fog">Use a decimal between 0 and 1. Example: 0.20 = 20%.</p>
+        </section>
+
+        <section className="rounded-lg border border-line bg-white p-6 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-display text-xl font-bold">Nexus AI / CraftX</h2>
+              <p className="text-sm text-fog">The site-wide chatbot uses this key on the server. Visitors never see it.</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm font-semibold shrink-0">
+              <input type="checkbox" checked={chatbotEnabled} onChange={(e) => setChatbotEnabled(e.target.checked)} />
+              Enabled
+            </label>
+          </div>
+
+          <label className="text-sm font-semibold">CraftX API key</label>
+          <input
+            type="password"
+            autoComplete="new-password"
+            className="input-field font-mono"
+            value={craftxKey}
+            onChange={(e) => { setCraftxKey(e.target.value); setClearKey(false); }}
+            placeholder={keyMeta.configured ? keyMeta.masked || 'Key saved — enter a new one to replace' : 'Paste your CraftX API key'}
+          />
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <span className={keyMeta.configured ? 'font-semibold text-mint-deep' : 'text-fog'}>
+              {keyMeta.configured ? `Saved key ${keyMeta.masked}` : 'No key saved yet'}
+            </span>
+            {keyMeta.configured && (
+              <button
+                type="button"
+                onClick={() => { setClearKey(true); setCraftxKey(''); setKeyMeta({ configured: false, masked: '' }); }}
+                className="font-semibold text-coral"
+              >
+                Remove key
+              </button>
+            )}
+          </div>
+
+          <label className="text-sm font-semibold">Model</label>
+          <input className="input-field" value={craftxModel} onChange={(e) => setCraftxModel(e.target.value)} placeholder="Qwen3 VL 30B" />
+          <p className="text-xs text-fog">
+            Default model is <span className="font-semibold">Qwen3 VL 30B</span>. Endpoint: api.craftx.corecraftsolutions.com
+          </p>
+        </section>
+
+        <button disabled={saving} className="btn-ink">{saving ? 'Saving...' : 'Save settings'}</button>
+      </form>
+    </div>
+  );
+}
+
+function Card({ label, value }) {
+  return (
+    <div className="rounded-lg border border-line bg-white p-5">
+      <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-fog mb-1">{label}</div>
+      <div className="font-display text-3xl font-extrabold">{value}</div>
+    </div>
+  );
+}
