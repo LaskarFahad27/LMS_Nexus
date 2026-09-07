@@ -77,3 +77,16 @@ export async function ensureChatbotSchema() {
   );
 }
 
+export async function repairEmptyCourseSlugs() {
+  const { rows } = await query(
+    `SELECT id, title, slug FROM courses
+     WHERE slug IS NULL OR btrim(slug) = '' OR slug = '-' OR slug ~ '^-+[0-9]*$'`
+  );
+  for (const course of rows) {
+    const slug = await uniqueSlug(course.title || `course-${course.id.slice(0, 8)}`, 'courses', course.id);
+    if (!isUsableSlug(course.slug) || course.slug !== slug) {
+      await query('UPDATE courses SET slug = $1, updated_at = NOW() WHERE id = $2', [slug, course.id]);
+    }
+  }
+  return rows.length;
+}
