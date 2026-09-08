@@ -1,0 +1,8 @@
+RewriteEngine On
+RewriteBase /lms/
+
+# SPA fallback so /lms/courses and /lms/checkout/... load index.html
+RewriteRule ^index\.html$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /lms/index.html [L]
